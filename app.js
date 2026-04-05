@@ -202,7 +202,8 @@ async function performOCR() {
         return;
     }
 
-    const lang = document.querySelector('input[name="lang"]:checked').value;
+    // Artık dil seçimi yok, Türkçe ve İngilizce aynı anda taranır
+    const lang = 'tur+eng';
     
     // UI state
     startOcrBtn.disabled = true;
@@ -213,10 +214,10 @@ async function performOCR() {
     resultSection.scrollIntoView({ behavior: 'smooth' });
 
     try {
-        statusText.innerText = 'El yazısı optimize ediliyor...';
+        statusText.innerText = 'Akıllı Analiz Başlatıldı...';
         const enhancedImage = await preprocessImage(imagePreview.src);
         
-        statusText.innerText = 'Bölgesel tarama başlatıldı...';
+        statusText.innerText = 'Karakter Kalıpları Çıkarılıyor...';
         
         const worker = await Tesseract.createWorker(lang, 1, {
             workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
@@ -226,7 +227,7 @@ async function performOCR() {
                     const progress = Math.round(m.progress * 100);
                     progressPercent.innerText = `${progress}%`;
                     progressBarFill.style.width = `${progress}%`;
-                    statusText.innerText = 'El yazısı detayları analiz ediliyor...';
+                    statusText.innerText = 'Hassas Tarama Sürüyor...';
                 }
             }
         });
@@ -241,12 +242,12 @@ async function performOCR() {
         
         const finalResult = text.trim() || 'Üzgünüz, metin algılanamadı.';
         resultText.value = finalResult;
-        statusText.innerText = 'El Yazısı Taraması Başarılı!';
+        statusText.innerText = 'İşlem Başarıyla Tamamlandı!';
         progressBarFill.style.width = '100%';
         progressPercent.innerText = '100%';
         
         // Save to History
-        if (finalResult && finalResult.length > 5) {
+        if (finalResult && finalResult.length > 3) {
             saveToHistory(finalResult);
         }
 
@@ -262,24 +263,20 @@ async function performOCR() {
     }
 }
 
-// History Functions
+// History Functions (PREMIUM REDESIGN)
 function saveToHistory(text) {
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     const newItem = {
         id: Date.now(),
-        date: new Date().toLocaleString('tr-TR'),
+        date: new Date().toLocaleDateString('tr-TR'),
+        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         text: text,
-        excerpt: text.substring(0, 50) + '...'
+        length: text.length,
+        excerpt: text.substring(0, 80) + '...'
     };
     
-    // Add to beginning
     history.unshift(newItem);
-    
-    // Limit history
-    if (history.length > MAX_HISTORY) {
-        history = history.slice(0, MAX_HISTORY);
-    }
-    
+    if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     renderHistory();
 }
@@ -298,17 +295,22 @@ function renderHistory() {
     
     history.forEach(item => {
         const div = document.createElement('div');
-        div.className = 'history-item glass';
+        div.className = 'history-card glass';
         div.innerHTML = `
-            <div class="history-info" onclick="loadFromHistory(${item.id})">
-                <span class="history-date">${item.date}</span>
-                <span class="history-excerpt">${item.excerpt}</span>
+            <div class="h-card-body" onclick="loadFromHistory(${item.id})">
+                <div class="h-card-header">
+                    <span class="h-card-tag"><i data-lucide="calendar"></i> ${item.date}</span>
+                    <span class="h-card-time">${item.time}</span>
+                </div>
+                <p class="h-card-text">${item.excerpt}</p>
+                <div class="h-card-footer">
+                    <span class="h-card-meta">${item.length} karakter</span>
+                    <i data-lucide="arrow-right" class="h-card-icon"></i>
+                </div>
             </div>
-            <div class="history-actions">
-                <button class="btn-icon btn-sm" onclick="deleteHistoryItem(${item.id})" title="Sil">
-                    <i data-lucide="trash-2"></i>
-                </button>
-            </div>
+            <button class="h-card-delete" onclick="deleteHistoryItem(event, ${item.id})" title="Sil">
+                <i data-lucide="x"></i>
+            </button>
         `;
         historyList.appendChild(div);
     });
@@ -326,7 +328,8 @@ window.loadFromHistory = function(id) {
     }
 }
 
-window.deleteHistoryItem = function(id) {
+window.deleteHistoryItem = function(event, id) {
+    event.stopPropagation();
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     history = history.filter(i => i.id !== id);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -376,57 +379,6 @@ function downloadAsPDF() {
     if (!resultText.value) return;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    const splitText = doc.splitTextToSize(resultText.value, 180);
-    doc.text(splitText, 15, 20);
-    doc.save('VisionText_Output.pdf');
-}
-
-function triggerDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-function copyToClipboard() {
-    resultText.select();
-    navigator.clipboard.writeText(resultText.value);
-    const originalIcon = copyBtn.innerHTML;
-    copyBtn.innerHTML = '<i data-lucide="check" style="color: var(--primary)"></i>';
-    lucide.createIcons();
-    setTimeout(() => {
-        copyBtn.innerHTML = originalIcon;
-        lucide.createIcons();
-    }, 2000);
-}
-
-function downloadAsTxt() {
-    const blob = new Blob([resultText.value], { type: 'text/plain' });
-    triggerDownload(blob, 'VisionText_Output.txt');
-}
-
-function downloadAsWord() {
-    if (!resultText.value) return;
-    // Word (.doc) için HTML şablonu
-    const content = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'></head>
-        <body style="font-family: Arial, sans-serif; white-space: pre-wrap;">
-            ${resultText.value.replace(/\n/g, '<br>')}
-        </body>
-        </html>
-    `;
-    const blob = new Blob([content], { type: 'application/msword' });
-    triggerDownload(blob, 'VisionText_Output.doc');
-}
-
-function downloadAsPDF() {
-    if (!resultText.value) return;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Basit bir metin yerleşimi (Sayfa sınırlarını kontrol ederek)
     const splitText = doc.splitTextToSize(resultText.value, 180);
     doc.text(splitText, 15, 20);
     doc.save('VisionText_Output.pdf');
