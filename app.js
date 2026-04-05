@@ -26,28 +26,47 @@ const closeKvkk = document.getElementById('close-kvkk');
 
 // Constants
 const HISTORY_KEY = 'mistechnology_ocr_history';
-const MAX_HISTORY = 10;
-
-// Use Tesseract from the global scope
+const MAX_HISTORY = 12;
 let selectedFile = null;
 
-// Initialization
+// Global Error Handling (For Mobile Debug)
+window.onerror = function(msg, url, lineNo) {
+    if (statusText) {
+        statusText.innerText = `Hata: ${msg} [L:${lineNo}]`;
+        statusText.style.color = "#ff4d4d";
+    }
+    return false;
+};
+
+// INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if libraries are loaded
-    if (typeof Tesseract === 'undefined') {
-        statusText.innerText = 'Hata: OCR Kütüphanesi yüklenemedi!';
+    // Check HTTPS on Mobile
+    if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+        const warning = document.createElement('div');
+        warning.className = 'glass';
+        warning.style.padding = '10px';
+        warning.style.color = '#fff';
+        warning.style.background = 'rgba(255,0,0,0.5)';
+        warning.style.margin = '10px 0';
+        warning.innerText = '⚠️ Dikkat: Mobil cihazlarda kameranın çalışması için HTTPS (Güvenli Bağlantı) gereklidir.';
+        document.querySelector('header').appendChild(warning);
     }
 
-    // Load History
     renderHistory();
 
-    // Drop zone click
+    // Setup Event Listeners
     document.getElementById('drop-zone').addEventListener('click', (e) => {
-        if(e.target.closest('.preview-actions') || e.target.closest('.upload-buttons')) return;
+        if (e.target.closest('.preview-actions') || e.target.closest('.upload-buttons')) return;
         fileInput.click();
     });
 
     fileInput.addEventListener('change', handleFileSelect);
+
+    cameraBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.setAttribute('capture', 'environment');
+        fileInput.click();
+    });
 
     resetBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -56,24 +75,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startOcrBtn.addEventListener('click', performOCR);
 
-    // Downloads
     copyBtn.addEventListener('click', copyToClipboard);
     downloadBtn.addEventListener('click', downloadAsTxt);
     wordBtn.addEventListener('click', downloadAsWord);
     pdfBtn.addEventListener('click', downloadAsPDF);
-    
-    // History
     clearHistoryBtn.addEventListener('click', clearAllHistory);
 
-    // Camera & KVKK
-    cameraBtn.addEventListener('click', () => fileInput.click());
     kvkkLink.addEventListener('click', (e) => {
         e.preventDefault();
         kvkkModal.classList.remove('hidden');
     });
+
     closeKvkk.addEventListener('click', () => kvkkModal.classList.add('hidden'));
-    
-    // Close modal on outside click
+
     window.addEventListener('click', (e) => {
         if (e.target === kvkkModal) kvkkModal.classList.add('hidden');
     });
@@ -99,8 +113,11 @@ function handleFileSelect(e) {
 
 function resetUI() {
     fileInput.value = '';
+    fileInput.removeAttribute('capture');
     selectedFile = null;
     imagePreview.src = '';
+    statusText.innerText = 'Hazırlanıyor...';
+    statusText.style.color = 'var(--text-secondary)';
     uploadPrompt.classList.remove('hidden');
     previewContainer.classList.add('hidden');
     resultSection.classList.add('hidden');
@@ -108,64 +125,37 @@ function resetUI() {
     scanLine.style.display = 'none';
 }
 
-/**
- * GELİŞMİŞ GÖRÜNTÜ İYİLEŞTİRME (V3 - El Yazısı Uzmanı)
- * 2x Upscaling + Keskinleştirme Matrisi + Bradley Adaptif Eşikleme
- */
 async function preprocessImage(imageSrc) {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
-            // 1. ADIM: 2x BÜYÜTME (Hassas kenar tespiti için)
-            const SCALE = 2;
+            const SCALE = img.width < 1200 ? 2 : 1;
             canvas.width = img.width * SCALE;
             canvas.height = img.height * SCALE;
-            ctx.imageSmoothingEnabled = true; // Büyütürken yumuşat
+            ctx.imageSmoothingEnabled = true;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            
+
             let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             let data = imageData.data;
             const w = canvas.width;
             const h = canvas.height;
 
-            // 2. ADIM: GRİ TONLAMA (Luminance)
             for (let i = 0; i < data.length; i += 4) {
-                const gray = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                 data[i] = data[i+1] = data[i+2] = gray;
             }
 
-            // 3. ADIM: KESKİNLEŞTİRME (Sharpen Convolution)
-            const sharpenedData = new Uint8ClampedArray(data.length);
-            for (let y = 1; y < h - 1; y++) {
-                for (let x = 1; x < w - 1; x++) {
-                    for (let c = 0; c < 3; c++) {
-                        const idx = (y * w + x) * 4 + c;
-                        const val = 5 * data[idx] 
-                                    - data[((y-1) * w + x) * 4 + c] 
-                                    - data[((y+1) * w + x) * 4 + c] 
-                                    - data[(y * w + (x-1)) * 4 + c] 
-                                    - data[(y * w + (x+1)) * 4 + c];
-                        sharpenedData[idx] = Math.min(255, Math.max(0, val));
-                    }
-                    sharpenedData[(y * w + x) * 4 + 3] = 255;
-                }
-            }
-            data.set(sharpenedData);
-
-            // 4. ADIM: BRADLEY ADAPTİF EŞİKLEME (Gölge Temizleme)
-            const S = Math.floor(w / 8); 
-            const T = 0.15; 
-            
+            const S = Math.floor(w / 8);
+            const T = 0.15;
             const integralImage = new Float32Array(w * h);
             for (let y = 0; y < h; y++) {
                 let sum = 0;
                 for (let x = 0; x < w; x++) {
                     sum += data[(y * w + x) * 4];
                     if (y === 0) integralImage[y * w + x] = sum;
-                    else integralImage[y * w + x] = integralImage[(y-1) * w + x] + sum;
+                    else integralImage[y * w + x] = integralImage[(y - 1) * w + x] + sum;
                 }
             }
 
@@ -177,19 +167,14 @@ async function preprocessImage(imageSrc) {
                     const y1 = Math.max(y - s2, 0);
                     const y2 = Math.min(y + s2, h - 1);
                     const count = (x2 - x1) * (y2 - y1);
-                    const sum = integralImage[y2 * w + x2] - integralImage[(y1-1) * w + x2] - integralImage[y2 * w + (x1-1)] + integralImage[(y1-1) * w + (x1-1)];
-                    
+                    const sum = (integralImage[y2 * w + x2] - (y1 > 0 ? integralImage[(y1-1) * w + x2] : 0) - (x1 > 0 ? integralImage[y2 * w + (x1-1)] : 0) + (x1 > 0 && y1 > 0 ? integralImage[(y1 - 1) * w + (x1 - 1)] : 0));
+
                     const idx = (y * w + x) * 4;
-                    if (data[idx] * count < sum * (1.0 - T)) {
-                        data[idx] = data[idx+1] = data[idx+2] = 0;
-                    } else {
-                        data[idx] = data[idx+1] = data[idx+2] = 255;
-                    }
+                    data[idx] = data[idx+1] = data[idx+2] = (data[idx] * count < sum * (1.0 - T)) ? 0 : 255;
                 }
             }
-            
             ctx.putImageData(imageData, 0, 0);
-            resolve(canvas.toDataURL('image/png', 1.0));
+            resolve(canvas.toDataURL('image/png', 0.9));
         };
         img.src = imageSrc;
     });
@@ -197,37 +182,27 @@ async function preprocessImage(imageSrc) {
 
 async function performOCR() {
     if (!selectedFile) return;
-    if (typeof Tesseract === 'undefined') {
-        alert('Kütüphane hatası!');
-        return;
-    }
-
-    // Artık dil seçimi yok, Türkçe ve İngilizce aynı anda taranır
     const lang = 'tur+eng';
-    
-    // UI state
+
     startOcrBtn.disabled = true;
     resultSection.classList.remove('hidden');
     progressContainer.classList.remove('hidden');
     scanLine.style.display = 'block';
     resultText.value = '';
-    resultSection.scrollIntoView({ behavior: 'smooth' });
 
     try {
-        statusText.innerText = 'Akıllı Analiz Başlatıldı...';
+        statusText.innerText = 'Akıllı Filtre Uygulanıyor...';
+        statusText.style.color = "var(--primary)";
         const enhancedImage = await preprocessImage(imagePreview.src);
-        
-        statusText.innerText = 'Karakter Kalıpları Çıkarılıyor...';
-        
+
+        statusText.innerText = 'Motor Başlatılıyor...';
         const worker = await Tesseract.createWorker(lang, 1, {
-            workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-            corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd.wasm.js',
             logger: m => {
                 if (m.status === 'recognizing text') {
                     const progress = Math.round(m.progress * 100);
                     progressPercent.innerText = `${progress}%`;
                     progressBarFill.style.width = `${progress}%`;
-                    statusText.innerText = 'Hassas Tarama Sürüyor...';
+                    statusText.innerText = 'Analiz Sürüyor...';
                 }
             }
         });
@@ -239,23 +214,16 @@ async function performOCR() {
         });
 
         const { data: { text } } = await worker.recognize(enhancedImage);
-        
-        const finalResult = text.trim() || 'Üzgünüz, metin algılanamadı.';
+        const finalResult = text.trim() || 'Hata: Metin bulunamadı.';
         resultText.value = finalResult;
-        statusText.innerText = 'İşlem Başarıyla Tamamlandı!';
-        progressBarFill.style.width = '100%';
-        progressPercent.innerText = '100%';
-        
-        // Save to History
-        if (finalResult && finalResult.length > 3) {
-            saveToHistory(finalResult);
-        }
+        statusText.innerText = 'Başarıyla Tamamlandı!';
 
+        if (finalResult.length > 3) saveToHistory(finalResult);
         await worker.terminate();
     } catch (error) {
+        statusText.innerText = 'Hata Oluştu!';
+        statusText.style.color = "#ff4d4d";
         console.error(error);
-        statusText.innerText = 'Hata!';
-        alert('Hata: ' + error.message);
     } finally {
         scanLine.style.display = 'none';
         startOcrBtn.disabled = false;
@@ -263,7 +231,6 @@ async function performOCR() {
     }
 }
 
-// History Functions (PREMIUM REDESIGN)
 function saveToHistory(text) {
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     const newItem = {
@@ -274,7 +241,6 @@ function saveToHistory(text) {
         length: text.length,
         excerpt: text.substring(0, 80) + '...'
     };
-    
     history.unshift(newItem);
     if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -283,19 +249,16 @@ function saveToHistory(text) {
 
 function renderHistory() {
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-    
     if (history.length === 0) {
         emptyHistory.classList.remove('hidden');
         historyList.innerHTML = '';
         return;
     }
-    
     emptyHistory.classList.add('hidden');
     historyList.innerHTML = '';
-    
     history.forEach(item => {
         const div = document.createElement('div');
-        div.className = 'history-card glass';
+        div.className = 'history-card';
         div.innerHTML = `
             <div class="h-card-body" onclick="loadFromHistory(${item.id})">
                 <div class="h-card-header">
@@ -308,17 +271,16 @@ function renderHistory() {
                     <i data-lucide="arrow-right" class="h-card-icon"></i>
                 </div>
             </div>
-            <button class="h-card-delete" onclick="deleteHistoryItem(event, ${item.id})" title="Sil">
+            <button class="h-card-delete" onclick="deleteHistoryItem(event, ${item.id})">
                 <i data-lucide="x"></i>
             </button>
         `;
         historyList.appendChild(div);
     });
-    
     lucide.createIcons();
 }
 
-window.loadFromHistory = function(id) {
+window.loadFromHistory = function (id) {
     const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     const item = history.find(i => i.id === id);
     if (item) {
@@ -328,7 +290,7 @@ window.loadFromHistory = function(id) {
     }
 }
 
-window.deleteHistoryItem = function(event, id) {
+window.deleteHistoryItem = function (event, id) {
     event.stopPropagation();
     let history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     history = history.filter(i => i.id !== id);
@@ -343,45 +305,13 @@ function clearAllHistory() {
     }
 }
 
-// Download Functions
 function copyToClipboard() {
     resultText.select();
     navigator.clipboard.writeText(resultText.value);
     const originalIcon = copyBtn.innerHTML;
-    copyBtn.innerHTML = '<i data-lucide="check" style="color: var(--primary)"></i>';
+    copyBtn.innerHTML = '<i data-lucide="check"></i>';
     lucide.createIcons();
-    setTimeout(() => {
-        copyBtn.innerHTML = originalIcon;
-        lucide.createIcons();
-    }, 2000);
-}
-
-function downloadAsTxt() {
-    const blob = new Blob([resultText.value], { type: 'text/plain' });
-    triggerDownload(blob, 'VisionText_Output.txt');
-}
-
-function downloadAsWord() {
-    if (!resultText.value) return;
-    const content = `
-        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><meta charset='utf-8'></head>
-        <body style="font-family: Arial, sans-serif; white-space: pre-wrap;">
-            ${resultText.value.replace(/\n/g, '<br>')}
-        </body>
-        </html>
-    `;
-    const blob = new Blob([content], { type: 'application/msword' });
-    triggerDownload(blob, 'VisionText_Output.doc');
-}
-
-function downloadAsPDF() {
-    if (!resultText.value) return;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const splitText = doc.splitTextToSize(resultText.value, 180);
-    doc.text(splitText, 15, 20);
-    doc.save('VisionText_Output.pdf');
+    setTimeout(() => { copyBtn.innerHTML = originalIcon; lucide.createIcons(); }, 2000);
 }
 
 function triggerDownload(blob, filename) {
@@ -391,4 +321,21 @@ function triggerDownload(blob, filename) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+}
+
+function downloadAsTxt() { triggerDownload(new Blob([resultText.value], { type: 'text/plain' }), 'Sonuc.txt'); }
+
+function downloadAsWord() {
+    if (!resultText.value) return;
+    const content = `<html><body>${resultText.value.replace(/\n/g, '<br>')}</body></html>`;
+    triggerDownload(new Blob([content], { type: 'application/msword' }), 'Sonuc.doc');
+}
+
+function downloadAsPDF() {
+    if (!resultText.value || !window.jspdf) return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const splitText = doc.splitTextToSize(resultText.value, 180);
+    doc.text(splitText, 15, 20);
+    doc.save('Sonuc.pdf');
 }
