@@ -19,6 +19,10 @@ const scanLine = document.getElementById('scan-line');
 const historyList = document.getElementById('history-list');
 const clearHistoryBtn = document.getElementById('clear-history-btn');
 const emptyHistory = document.getElementById('empty-history');
+const cameraBtn = document.getElementById('camera-btn');
+const kvkkLink = document.getElementById('kvkk-link');
+const kvkkModal = document.getElementById('kvkk-modal');
+const closeKvkk = document.getElementById('close-kvkk');
 
 // Constants
 const HISTORY_KEY = 'mistechnology_ocr_history';
@@ -39,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Drop zone click
     document.getElementById('drop-zone').addEventListener('click', (e) => {
-        if(e.target.closest('.preview-actions') || e.target.closest('.btn-primary')) return;
+        if(e.target.closest('.preview-actions') || e.target.closest('.upload-buttons')) return;
         fileInput.click();
     });
 
@@ -60,6 +64,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // History
     clearHistoryBtn.addEventListener('click', clearAllHistory);
+
+    // Camera & KVKK
+    cameraBtn.addEventListener('click', () => fileInput.click());
+    kvkkLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        kvkkModal.classList.remove('hidden');
+    });
+    closeKvkk.addEventListener('click', () => kvkkModal.classList.add('hidden'));
+    
+    // Close modal on outside click
+    window.addEventListener('click', (e) => {
+        if (e.target === kvkkModal) kvkkModal.classList.add('hidden');
+    });
 });
 
 function handleFileSelect(e) {

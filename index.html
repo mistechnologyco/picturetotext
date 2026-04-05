@@ -40,9 +40,14 @@
                         <i data-lucide="upload-cloud" class="upload-icon"></i>
                         <h3>Resim Yükle veya Fotoğraf Çek</h3>
                         <p>Sürükle bırak yapabilir veya buraya tıklayabilirsin</p>
-                        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
-                            Dosya Seç
-                        </button>
+                        <div class="upload-buttons">
+                            <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                                <i data-lucide="file-up"></i> Dosya Seç
+                            </button>
+                            <button class="btn btn-accent" id="camera-btn">
+                                <i data-lucide="camera"></i> Fotoğraf Çek
+                            </button>
+                        </div>
                     </div>
 
                     <div class="preview-container hidden" id="preview-container">
@@ -60,17 +65,6 @@
             </section>
 
             <section class="controls-section">
-                <div class="language-selector glass">
-                    <span>Dil Seçimi:</span>
-                    <div class="options">
-                        <input type="radio" name="lang" id="lang-tur" value="tur" checked>
-                        <label for="lang-tur">Türkçe</label>
-
-                        <input type="radio" name="lang" id="lang-eng" value="eng">
-                        <label for="lang-eng">İngilizce</label>
-                    </div>
-                </div>
-
                 <button class="btn btn-action" id="start-ocr-btn" disabled>
                     <i data-lucide="zap"></i> Metne Dönüştür
                 </button>
@@ -130,8 +124,33 @@
         </main>
 
         <footer>
-            <p>&copy; 2026 <a href="https://mistechnology.co/" target="_blank" style="color: var(--primary); text-decoration: none;">MisTechnology.co</a> | <span class="badge">m1.0</span></p>
+            <div class="footer-content">
+                <p>&copy; 2026 <a href="https://mistechnology.co/" target="_blank">MisTechnology.co</a> | <span class="badge">m1.0</span></p>
+                <div class="footer-links">
+                    <a href="#" id="kvkk-link">Gizlilik ve KVKK Politikası</a>
+                </div>
+            </div>
         </footer>
+    </div>
+
+    <!-- KVKK MODAL -->
+    <div id="kvkk-modal" class="modal hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3>Gizlilik ve KVKK Politikası</h3>
+                <button class="btn-icon" id="close-kvkk"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>MisTechnology.co</strong> olarak kişisel verilerinizin güvenliğine önem veriyoruz.</p>
+                <ul>
+                    <li><strong>Yerel İşleme:</strong> Yüklediğiniz tüm görseller ve taranan metinler sadece sizin cihazınızda işlenir.</li>
+                    <li><strong>Veri Gönderimi:</strong> Uygulamamız hiçbir görseli veya metni sunucularımıza ya da üçüncü taraf servislerine göndermez.</li>
+                    <li><strong>Saklama:</strong> Tarama geçmişi sadece sizin tarayıcınızın (LocalStorage) belleğinde saklanır ve dilediğiniz zaman silebilirsiniz.</li>
+                    <li><strong>Güvenlik:</strong> Tüm OCR (karakter tanıma) işlemleri tarayıcı seviyesinde çevrimdışı (offline-capable) olarak çalışır.</li>
+                </ul>
+                <p>Bu uygulama, modern web teknolojileri (Tesseract.js) kullanılarak en yüksek gizlilik standartlarında ("Privacy-by-Design") geliştirilmiştir.</p>
+            </div>
+        </div>
     </div>
 
     <!-- Libraries -->
