@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MisTechnology.co | Görselden Metne Dönüştürücü</title>
+    <meta name="description"
+        content="Kameradan veya galeriden resim yükleyin, el yazısı dahil tüm metinleri saniyeler içinde dijital yazıya çevirin.">
+    <!-- Google Fonts: Inter & Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Montserrat:wght@700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Lucide Icons for premium feel -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Decoration Elements -->
+        <div class="bg-glow blob-1"></div>
+        <div class="bg-glow blob-2"></div>
+
+        <header>
+            <div class="logo">
+                <i data-lucide="scan-text"></i>
+                <h1>MisTechnology<span>.co</span></h1>
+            </div>
+            <p class="subtitle">Yazıları Dijital Dünyaya Taşıyın</p>
+        </header>
+
+        <main>
+            <section class="upload-section" id="drop-zone">
+                <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+                <div class="upload-card glass">
+                    <div class="upload-content" id="upload-prompt">
+                        <i data-lucide="upload-cloud" class="upload-icon"></i>
+                        <h3>Resim Yükle veya Fotoğraf Çek</h3>
+                        <p>Sürükle bırak yapabilir veya buraya tıklayabilirsin</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                            Dosya Seç
+                        </button>
+                    </div>
+
+                    <div class="preview-container hidden" id="preview-container">
+                        <div class="image-wrapper">
+                            <img id="image-preview" src="" alt="Önizleme">
+                            <div class="scan-line" id="scan-line"></div>
+                        </div>
+                        <div class="preview-actions">
+                            <button class="btn btn-secondary" id="reset-btn">
+                                <i data-lucide="rotate-ccw"></i> Yeni Resim
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="controls-section">
+                <div class="language-selector glass">
+                    <span>Dil Seçimi:</span>
+                    <div class="options">
+                        <input type="radio" name="lang" id="lang-tur" value="tur" checked>
+                        <label for="lang-tur">Türkçe</label>
+
+                        <input type="radio" name="lang" id="lang-eng" value="eng">
+                        <label for="lang-eng">İngilizce</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-action" id="start-ocr-btn" disabled>
+                    <i data-lucide="zap"></i> Metne Dönüştür
+                </button>
+            </section>
+
+            <section class="result-section hidden" id="result-section">
+                <div class="progress-container glass" id="progress-container">
+                    <div class="progress-header">
+                        <span id="status-text">Hazırlanıyor...</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                    </div>
+                </div>
+
+                <div class="result-card glass">
+                    <div class="result-header">
+                        <h3>Çıkarılan Metin</h3>
+                        <div class="result-actions">
+                            <button class="btn-icon" title="Kopyala" id="copy-btn">
+                                <i data-lucide="copy"></i>
+                            </button>
+                            <button class="btn-icon" title="Word Olarak İndir" id="word-btn">
+                                <i data-lucide="file-text"></i>
+                            </button>
+                            <button class="btn-icon" title="PDF Olarak İndir" id="pdf-btn">
+                                <i data-lucide="file-down"></i>
+                            </button>
+                            <button class="btn-icon" title="Metin Olarak İndir" id="download-btn">
+                                <i data-lucide="download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="result-text" placeholder="Metin burada görünecek..." spellcheck="false"></textarea>
+                </div>
+            </section>
+
+            <!-- SCAN HISTORY SECTION -->
+            <section class="history-section">
+                <div class="history-header">
+                    <div class="title">
+                        <i data-lucide="history"></i>
+                        <h3>Son Taramalar</h3>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="clear-history-btn">
+                        Temizle
+                    </button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <!-- History items will be injected here -->
+                    <div class="empty-history" id="empty-history">
+                        <p>Henüz geçmiş tarama bulunmuyor.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 <a href="https://mistechnology.co/" target="_blank" style="color: var(--primary); text-decoration: none;">MisTechnology.co</a> | <span class="badge">m1.0</span></p>
+        </footer>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>
